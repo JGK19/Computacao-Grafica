@@ -1,0 +1,11 @@
+creating:
+
+ python -m venv myenv
+
+ activating:
+
+ myenv\Scripts\activate  
+
+
+
+ numpy==1.26.0
