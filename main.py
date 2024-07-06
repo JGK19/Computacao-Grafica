@@ -110,3 +110,5 @@ class Triangule:
         glDeleteVertexArrays(1, (self.vao,))
         glDeleteBuffers(1, (self.vbo,))
 
+if __name__ == '__main__':
+    app = App()
