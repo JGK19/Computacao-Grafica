@@ -15,9 +15,14 @@ class App:
 
         # initialize opengl
         glClearColor(0.1, 0.2, 0.2, 1)
+        glEnable(GL_BLEND) #thats to enable png things
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA) #thats to enable png things # standart functions to alpha blending
         self.shader = self.createShader(VERTEX_PATH, FRAGMENT_PATH)
         glUseProgram(self.shader)
+        glUniform1i(glGetUniformLocation(self.shader, "imageTexture"), 0)
         self.triangule = Triangule()
+        self.duck_texture = Material("gfx/shelbyfeliz.jpg")
+        #self.duckpng_texture = Material("gfx/patoteste.png")
         self.mainLoop()
 
     def createShader(self, vertexFilepath, fragmentFilepath):
@@ -48,7 +53,7 @@ class App:
             # refresh screen
             glClear(GL_COLOR_BUFFER_BIT)
 
-            self.triangule.draw(self.shader)
+            self.triangule.draw(self.shader, self.duck_texture)
             pygame.display.flip()
 
             #timing
@@ -58,6 +63,7 @@ class App:
 
     def quit(self):
         self.triangule.destroy()
+        self.duck_texture.destroy()
         glDeleteProgram(self.shader)
         pygame.quit()
 
@@ -67,12 +73,12 @@ class Triangule:
 
         # tuple of vertices, vertices are not just positions,
         # are all the data we want to store in each point of a primitive, position, color, texture and etc
-        # x, y, z r, g, b
+        # x, y, z r, g, b, s, t
         # z = 0 equals flat
         self.vertices = (
-            -0.5, -0.5, 0.0, 1.0, 0.0, 0.0,
-            0.5, -0.5, 0.0, 0.0, 1.0, 0.0,
-            0.0, 0.5, 0.0, 0.0, 0.0, 1.0,
+            -0.5, -0.5, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
+            0.5, -0.5, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0,
+            0.0, 0.5, 0.0, 0.0, 0.0, 1.0, 0.5, 0.0,
         )
 
         # graphcs card cant read tuples, but can read arrays, there is no built in data type in python for this, i think
@@ -94,21 +100,51 @@ class Triangule:
         # enable attribute and then describe how it is laid out in the vbo
         glEnableVertexAttribArray(0) # enable attribute position 
         # what mean (attr, how many points are in each attr, data type, normalize?, howmanybytes to get the next point or color "stride", offset where data begin)
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 24, ctypes.c_void_p(0))
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 32, ctypes.c_void_p(0))
 
         # enable attribute color
         glEnableVertexAttribArray(1)
         # what mean (attr, how many points are in each attr, data type, normalize?, howmanybytes to get the next point or color "stride", offset where data begin)
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 24, ctypes.c_void_p(12))
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 32, ctypes.c_void_p(12))
 
-    def draw(self, shader):
+         # enable attribute color
+        glEnableVertexAttribArray(2)
+        # what mean (attr, how many points are in each attr, data type, normalize?, howmanybytes to get the next point or color "stride", offset where data begin)
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 32, ctypes.c_void_p(24))
+
+    def draw(self, shader, texture):
         glUseProgram(shader)
+        texture.use()
         glBindVertexArray(self.vao)
         glDrawArrays(GL_TRIANGLES, 0, self.vertex_count)
     
     def destroy(self):
         glDeleteVertexArrays(1, (self.vao,))
         glDeleteBuffers(1, (self.vbo,))
+
+
+class Material:
+
+    def __init__(self, filepath):
+        self.texture = glGenTextures(1)
+        glBindTexture(GL_TEXTURE_2D, self.texture)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+
+        image = pygame.image.load(filepath).convert_alpha() #only .convert() does not handle transparency, so using convert_alpha()
+        image_width, image_height = image.get_rect().size
+        image_data = pygame.image.tostring(image, "RGBA")
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image_width, image_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_data)
+        glGenerateMipmap(GL_TEXTURE_2D)
+    
+    def use(self):
+        glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_2D, self.texture)
+    
+    def destroy(self):
+        glDeleteTextures(1, (self.texture,))
 
 if __name__ == '__main__':
     app = App()
