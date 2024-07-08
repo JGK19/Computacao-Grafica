@@ -14,14 +14,14 @@ class App:
         self.clock = pygame.time.Clock()
 
         # initialize opengl
-        glClearColor(0.1, 0.2, 0.2, 1)
+        glClearColor(1.0, 1.0, 1.0, 1)
         glEnable(GL_BLEND) #thats to enable png things
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA) #thats to enable png things # standart functions to alpha blending
         self.shader = self.createShader(VERTEX_PATH, FRAGMENT_PATH)
         glUseProgram(self.shader)
         glUniform1i(glGetUniformLocation(self.shader, "imageTexture"), 0)
         self.triangule = Triangule()
-        self.duck_texture = Material("gfx/shelbyfeliz.jpg")
+        self.duck_texture = Material("gfx/patoteste1.png")
         #self.duckpng_texture = Material("gfx/patoteste.png")
         self.mainLoop()
 
@@ -114,7 +114,8 @@ class Triangule:
 
     def draw(self, shader, texture):
         glUseProgram(shader)
-        texture.use()
+        if texture != None:
+            texture.use()
         glBindVertexArray(self.vao)
         glDrawArrays(GL_TRIANGLES, 0, self.vertex_count)
     
