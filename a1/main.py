@@ -30,11 +30,11 @@ class App:
         glUniform1i(glGetUniformLocation(self.shader, "imageTexture"), 0)
 
         self.cube = Cube(
-            position=[0,0,-3],
+            position=[0,0,-4],
             eulers=[0,0,0],
         )
 
-        self.cube_mesh = CubeMesh()
+        self.cube_mesh = Mesh("models/testcube.obj")
 
         self.duck_texture = Material("gfx/patoteste1.png")
         #self.duckpng_texture = Material("gfx/patoteste.png")
@@ -79,23 +79,17 @@ class App:
             for event in pygame.event.get():
                 if (event.type == pygame.QUIT):
                     running = False
-
+                
 
             # update cube
             self.cube.eulers[2] += 0.2
-            #self.cube.eulers[1] += 0.2
-            #self.cube.eulers[2] += 0.2
             if (self.cube.eulers[2] > 360):
                 self.cube.eulers[2] -= 360
-                #self.cube.eulers[1] -= 360
-                #self.cube.eulers[2] -= 360
 
             # refresh screen
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-            #self.triangule.draw(self.shader, self.duck_texture)
-            glUseProgram(self.shader)
-            self.duck_texture.use()
+
 
             model_transform = pyrr.matrix44.create_identity(dtype=np.float32)
             model_transform = pyrr.matrix44.multiply(
@@ -118,6 +112,27 @@ class App:
             glBindVertexArray(self.cube_mesh.vao)
             glDrawArrays(GL_TRIANGLES, 0, self.cube_mesh.vertex_count)
             
+            model_transform = pyrr.matrix44.create_identity(dtype=np.float32)
+            model_transform = pyrr.matrix44.multiply(
+                m1=model_transform,
+                m2=pyrr.matrix44.create_from_eulers(
+                    eulers=np.radians(self.cube.eulers),
+                    dtype=np.float32,
+                )
+            )
+
+            model_transform = pyrr.matrix44.multiply(
+                m1=model_transform,
+                m2=pyrr.matrix44.create_from_translation(
+                    vec=self.cube.position,
+                    dtype=np.float32,
+                )
+            )
+
+            glUniformMatrix4fv(self.modelMatrixLocation, 1, GL_FALSE, model_transform)
+            glBindVertexArray(self.cube_mesh.vao)
+            glDrawArrays(GL_TRIANGLES, 0, self.cube_mesh.vertex_count)
+
             pygame.display.flip()
 
             #timing
@@ -131,89 +146,105 @@ class App:
         glDeleteProgram(self.shader)
         pygame.quit()
 
-class CubeMesh:
+class Mesh:
 
-    def __init__(self):
-
-        # tuple of vertices, vertices are not just positions,
-        # are all the data we want to store in each point of a primitive, position, color, texture and etc
-        # x, y, z, s, t
-        # z = 0 equals flat
-        self.vertices = (
-            -0.5, -0.5, -0.5, 0, 0,
-             0.5, -0.5, -0.5, 1, 0,
-             0.5,  0.5, -0.5, 1, 1,
-
-             0.5,  0.5, -0.5, 1, 1,
-            -0.5,  0.5, -0.5, 0, 1,
-            -0.5, -0.5, -0.5, 0, 0,
-
-            -0.5, -0.5,  0.5, 0, 0,
-             0.5, -0.5,  0.5, 1, 0,
-             0.5,  0.5,  0.5, 1, 1,
-
-             0.5,  0.5,  0.5, 1, 1,
-            -0.5,  0.5,  0.5, 0, 1,
-            -0.5, -0.5,  0.5, 0, 0,
-
-            -0.5,  0.5,  0.5, 1, 0,
-            -0.5,  0.5, -0.5, 1, 1,
-            -0.5, -0.5, -0.5, 0, 1,
-
-            -0.5, -0.5, -0.5, 0, 1,
-            -0.5, -0.5,  0.5, 0, 0,
-            -0.5,  0.5,  0.5, 1, 0,
-
-             0.5,  0.5,  0.5, 1, 0,
-             0.5,  0.5, -0.5, 1, 1,
-             0.5, -0.5, -0.5, 0, 1,
-
-             0.5, -0.5, -0.5, 0, 1,
-             0.5, -0.5,  0.5, 0, 0,
-             0.5,  0.5,  0.5, 1, 0,
-
-            -0.5, -0.5, -0.5, 0, 1,
-             0.5, -0.5, -0.5, 1, 1,
-             0.5, -0.5,  0.5, 1, 0,
-
-             0.5, -0.5,  0.5, 1, 0,
-            -0.5, -0.5,  0.5, 0, 0,
-            -0.5, -0.5, -0.5, 0, 1,
-
-            -0.5,  0.5, -0.5, 0, 1,
-             0.5,  0.5, -0.5, 1, 1,
-             0.5,  0.5,  0.5, 1, 0,
-
-             0.5,  0.5,  0.5, 1, 0,
-            -0.5,  0.5,  0.5, 0, 0,
-            -0.5,  0.5, -0.5, 0, 1
-        )
-
-        # graphcs card cant read tuples, but can read arrays, there is no built in data type in python for this, i think
+    def __init__(self, filename):
+        # x, y, z, s, t, nx, ny, nz
+        self.vertices = self.loadMesh(filename)
+        self.vertex_count = len(self.vertices) // 8
         self.vertices = np.array(self.vertices, dtype=np.float32)
 
-        self.vertex_count = len(self.vertices) // 5
-
-        # what the numbers in array mean? 
-        # search later about lines 60 and 61
         self.vao = glGenVertexArrays(1)
         glBindVertexArray(self.vao)
 
-        self.vbo = glGenBuffers(1) #generate one buffer for us, a basic storage container?
-        glBindBuffer(GL_ARRAY_BUFFER, self.vbo) # binding the buffer, talking about GL_ARRAY_BUFFER is talking about self.vbo
-
-         # ship our vertices to the graphcs card, (where load, how many bytes, pass data, how we plan use the data)
+        # vertices
+        self.vbo = glGenBuffers(1)
+        glBindBuffer(GL_ARRAY_BUFFER, self.vbo)
         glBufferData(GL_ARRAY_BUFFER, self.vertices.nbytes, self.vertices, GL_STATIC_DRAW)
 
-        # enable attribute and then describe how it is laid out in the vbo
-        glEnableVertexAttribArray(0) # enable attribute position 
-        # what mean (attr, how many points are in each attr, data type, normalize?, howmanybytes to get the next point or color "stride", offset where data begin)
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 20, ctypes.c_void_p(0))
-
-        # enable attribute color
+        # position
+        glEnableVertexAttribArray(0)
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 32, ctypes.c_void_p(0))
+        
+        #texture
         glEnableVertexAttribArray(1)
-        # what mean (attr, how many points are in each attr, data type, normalize?, howmanybytes to get the next point or color "stride", offset where data begin)
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 20, ctypes.c_void_p(12))
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 32, ctypes.c_void_p(12))
+    
+    def loadMesh(self, filename: str) -> list[float]:
+
+        vertices = []
+
+        v = []
+        vt = []
+        vn = []
+
+        with open(filename, "r") as file:
+            line = file.readline()
+
+            while line:
+                words = line.split(" ")
+                if words[0] == "v":
+                    v.append(self.read_vertex_data(words))
+                elif words[0] == "vt":
+                    vt.append(self.read_textcoord_data(words))
+                elif words[0] == "vn":
+                    vn.append(self.read_normal_data(words))
+                elif words[0] == "f":
+                    self.read_face_data(words, v, vt, vn, vertices)
+                line = file.readline()
+
+        return vertices
+
+    def read_face_data(
+        self, words: list[str], 
+        v: list[list[float]], vt: list[list[float]], 
+        vn: list[list[float]], vertices: list[float]) -> None:
+        
+        triangleCount = len(words) - 3
+
+        for i in range(triangleCount):
+
+            self.make_corner(words[1], v, vt, vn, vertices)
+            self.make_corner(words[2 + i], v, vt, vn, vertices)
+            self.make_corner(words[3 + i], v, vt, vn, vertices)
+        
+    def make_corner(
+        self, corner_description: str, 
+        v: list[list[float]], vt: list[list[float]], 
+        vn: list[list[float]], vertices: list[float]) -> None:
+
+        v_vt_vn = corner_description.split("/")
+        for element in v[int(v_vt_vn[0]) - 1]:
+            vertices.append(element)
+        for element in vt[int(v_vt_vn[1]) - 1]:
+            vertices.append(element)
+        for element in vn[int(v_vt_vn[2]) - 1]:
+            vertices.append(element)
+    
+    def read_vertex_data(self, words: list[str]) -> list[float]:
+
+        return [
+            float(words[1]),
+            float(words[2]),
+            float(words[3]),
+        ]
+    
+    def read_textcoord_data(self, words: list[str]) -> list[float]:
+
+        return [
+            float(words[1]),
+            float(words[2]),
+        ]
+    
+    def read_normal_data(self, words: list[str]) -> list[float]:
+
+        return [
+            float(words[1]),
+            float(words[2]),
+            float(words[3]),
+        ]
+    
+
 
     def draw(self, shader, texture):
         glUseProgram(shader)
@@ -221,7 +252,14 @@ class CubeMesh:
             texture.use()
         glBindVertexArray(self.vao)
         glDrawArrays(GL_TRIANGLES, 0, self.vertex_count)
-    
+     
+    def draw(self, shader, texture):
+        glUseProgram(shader)
+        if texture != None:
+            texture.use()
+        glBindVertexArray(self.vao)
+        glDrawArrays(GL_TRIANGLES, 0, self.vertex_count)
+
     def destroy(self):
         glDeleteVertexArrays(1, (self.vao,))
         glDeleteBuffers(1, (self.vbo,))
