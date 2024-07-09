@@ -4,9 +4,16 @@ import numpy as np
 from VAR import *
 from OpenGL.GL.shaders import compileProgram, compileShader
 
+import pyrr
 
+class Cube:
+
+    def __init__(self, position, eulers):
+        self.position = np.array(position, dtype=np.float32)
+        self.eulers = np.array(eulers, dtype=np.float32)
 
 class App:
+
     def __init__(self):
         # initialize pygame
         pygame.init()
@@ -14,15 +21,38 @@ class App:
         self.clock = pygame.time.Clock()
 
         # initialize opengl
-        glClearColor(1.0, 1.0, 1.0, 1)
+        glClearColor(0.1, 0.2, 0.2, 1)
         glEnable(GL_BLEND) #thats to enable png things
+        glEnable(GL_DEPTH_TEST) #drawing things in front of eachother propeçy
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA) #thats to enable png things # standart functions to alpha blending
         self.shader = self.createShader(VERTEX_PATH, FRAGMENT_PATH)
         glUseProgram(self.shader)
         glUniform1i(glGetUniformLocation(self.shader, "imageTexture"), 0)
-        self.triangule = Triangule()
+
+        self.cube = Cube(
+            position=[0,0,-3],
+            eulers=[0,0,0],
+        )
+
+        self.cube_mesh = CubeMesh()
+
         self.duck_texture = Material("gfx/patoteste1.png")
         #self.duckpng_texture = Material("gfx/patoteste.png")
+
+        projection_transform = pyrr.matrix44.create_perspective_projection( # magical matrix i could have done this myself somehow
+            fovy = 45, aspect = SCREEN_RESOLUTION[0]/SCREEN_RESOLUTION[1], 
+            near = 0.1, far = 10, dtype = np.float32,
+        )
+
+        glUniformMatrix4fv( # passing to the shaders scripts i think (that thing, qtd matrix, GL_FALSE, actually the matrix)
+            glGetUniformLocation(self.shader, "projection"),
+            1, GL_FALSE, projection_transform
+        )
+
+        self.modelMatrixLocation = glGetUniformLocation(self.shader, "model")
+
+
+
         self.mainLoop()
 
     def createShader(self, vertexFilepath, fragmentFilepath):
@@ -50,10 +80,44 @@ class App:
                 if (event.type == pygame.QUIT):
                     running = False
 
-            # refresh screen
-            glClear(GL_COLOR_BUFFER_BIT)
 
-            self.triangule.draw(self.shader, self.duck_texture)
+            # update cube
+            self.cube.eulers[2] += 0.2
+            #self.cube.eulers[1] += 0.2
+            #self.cube.eulers[2] += 0.2
+            if (self.cube.eulers[2] > 360):
+                self.cube.eulers[2] -= 360
+                #self.cube.eulers[1] -= 360
+                #self.cube.eulers[2] -= 360
+
+            # refresh screen
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+
+            #self.triangule.draw(self.shader, self.duck_texture)
+            glUseProgram(self.shader)
+            self.duck_texture.use()
+
+            model_transform = pyrr.matrix44.create_identity(dtype=np.float32)
+            model_transform = pyrr.matrix44.multiply(
+                m1=model_transform,
+                m2=pyrr.matrix44.create_from_eulers(
+                    eulers=np.radians(self.cube.eulers),
+                    dtype=np.float32,
+                )
+            )
+
+            model_transform = pyrr.matrix44.multiply(
+                m1=model_transform,
+                m2=pyrr.matrix44.create_from_translation(
+                    vec=self.cube.position,
+                    dtype=np.float32,
+                )
+            )
+
+            glUniformMatrix4fv(self.modelMatrixLocation, 1, GL_FALSE, model_transform)
+            glBindVertexArray(self.cube_mesh.vao)
+            glDrawArrays(GL_TRIANGLES, 0, self.cube_mesh.vertex_count)
+            
             pygame.display.flip()
 
             #timing
@@ -62,29 +126,73 @@ class App:
         self.quit()
 
     def quit(self):
-        self.triangule.destroy()
+        self.cube_mesh.destroy()
         self.duck_texture.destroy()
         glDeleteProgram(self.shader)
         pygame.quit()
 
-class Triangule:
+class CubeMesh:
 
     def __init__(self):
 
         # tuple of vertices, vertices are not just positions,
         # are all the data we want to store in each point of a primitive, position, color, texture and etc
-        # x, y, z r, g, b, s, t
+        # x, y, z, s, t
         # z = 0 equals flat
         self.vertices = (
-            -0.5, -0.5, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
-            0.5, -0.5, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0,
-            0.0, 0.5, 0.0, 0.0, 0.0, 1.0, 0.5, 0.0,
+            -0.5, -0.5, -0.5, 0, 0,
+             0.5, -0.5, -0.5, 1, 0,
+             0.5,  0.5, -0.5, 1, 1,
+
+             0.5,  0.5, -0.5, 1, 1,
+            -0.5,  0.5, -0.5, 0, 1,
+            -0.5, -0.5, -0.5, 0, 0,
+
+            -0.5, -0.5,  0.5, 0, 0,
+             0.5, -0.5,  0.5, 1, 0,
+             0.5,  0.5,  0.5, 1, 1,
+
+             0.5,  0.5,  0.5, 1, 1,
+            -0.5,  0.5,  0.5, 0, 1,
+            -0.5, -0.5,  0.5, 0, 0,
+
+            -0.5,  0.5,  0.5, 1, 0,
+            -0.5,  0.5, -0.5, 1, 1,
+            -0.5, -0.5, -0.5, 0, 1,
+
+            -0.5, -0.5, -0.5, 0, 1,
+            -0.5, -0.5,  0.5, 0, 0,
+            -0.5,  0.5,  0.5, 1, 0,
+
+             0.5,  0.5,  0.5, 1, 0,
+             0.5,  0.5, -0.5, 1, 1,
+             0.5, -0.5, -0.5, 0, 1,
+
+             0.5, -0.5, -0.5, 0, 1,
+             0.5, -0.5,  0.5, 0, 0,
+             0.5,  0.5,  0.5, 1, 0,
+
+            -0.5, -0.5, -0.5, 0, 1,
+             0.5, -0.5, -0.5, 1, 1,
+             0.5, -0.5,  0.5, 1, 0,
+
+             0.5, -0.5,  0.5, 1, 0,
+            -0.5, -0.5,  0.5, 0, 0,
+            -0.5, -0.5, -0.5, 0, 1,
+
+            -0.5,  0.5, -0.5, 0, 1,
+             0.5,  0.5, -0.5, 1, 1,
+             0.5,  0.5,  0.5, 1, 0,
+
+             0.5,  0.5,  0.5, 1, 0,
+            -0.5,  0.5,  0.5, 0, 0,
+            -0.5,  0.5, -0.5, 0, 1
         )
 
         # graphcs card cant read tuples, but can read arrays, there is no built in data type in python for this, i think
         self.vertices = np.array(self.vertices, dtype=np.float32)
 
-        self.vertex_count = 3
+        self.vertex_count = len(self.vertices) // 5
 
         # what the numbers in array mean? 
         # search later about lines 60 and 61
@@ -100,17 +208,12 @@ class Triangule:
         # enable attribute and then describe how it is laid out in the vbo
         glEnableVertexAttribArray(0) # enable attribute position 
         # what mean (attr, how many points are in each attr, data type, normalize?, howmanybytes to get the next point or color "stride", offset where data begin)
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 32, ctypes.c_void_p(0))
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 20, ctypes.c_void_p(0))
 
         # enable attribute color
         glEnableVertexAttribArray(1)
         # what mean (attr, how many points are in each attr, data type, normalize?, howmanybytes to get the next point or color "stride", offset where data begin)
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 32, ctypes.c_void_p(12))
-
-         # enable attribute color
-        glEnableVertexAttribArray(2)
-        # what mean (attr, how many points are in each attr, data type, normalize?, howmanybytes to get the next point or color "stride", offset where data begin)
-        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 32, ctypes.c_void_p(24))
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 20, ctypes.c_void_p(12))
 
     def draw(self, shader, texture):
         glUseProgram(shader)
