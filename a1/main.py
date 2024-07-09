@@ -14,7 +14,7 @@ class App:
         self.clock = pygame.time.Clock()
 
         # initialize opengl
-        glClearColor(1.0, 1.0, 1.0, 1)
+        glClearColor(0.1, 0.2, 0.2, 1)
         glEnable(GL_BLEND) #thats to enable png things
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA) #thats to enable png things # standart functions to alpha blending
         self.shader = self.createShader(VERTEX_PATH, FRAGMENT_PATH)
