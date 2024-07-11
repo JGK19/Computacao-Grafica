@@ -34,7 +34,7 @@ class App:
             eulers=[0,0,0],
         )
 
-        self.cube_mesh = Mesh("models/testcube.obj")
+        self.cube_mesh = Mesh("models/sphere.obj")
 
         self.duck_texture = Material("gfx/patoteste1.png")
         #self.duckpng_texture = Material("gfx/patoteste.png")
